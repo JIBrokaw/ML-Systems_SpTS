@@ -1,7 +1,7 @@
 /*****************************************************************************
  * File:        matrix_mult.cu
  *
- * Run:         ./conv2D
+ * Run:         ./matrix_mult
  *****************************************************************************/
 
 #include <stdio.h>
@@ -17,15 +17,23 @@ void basic_mult(float* matrix_A, float* matrix_B, float* out, int size)
       float val = 0;
       for (int col = 0; col <= row; col++){
         val += matrix_A[row*size + col]*matrix_B[col*size + output_col];
-        printf("Row %d, Column %d: %f\n", row, col, val);
       }
       out[row*size + output_col] = val;
     }
   }
 }
 
+void printMatrix(float* matrix, int matrix_size){
+  for(int i = 0; i < matrix_size; i++){
+    for(int j = 0; j < matrix_size; j++){
+      printf(" %f", matrix[matrix_size*i + j]);
+    }
+    printf("\n");
+  }
+}
 
-bool multiply(int matrix_size)
+
+bool multiply(int matrix_size, float sparsity)
 {
     unsigned int bytes = matrix_size * matrix_size * sizeof(float);
     float* h_A, *h_B, *h_out;
@@ -40,27 +48,27 @@ bool multiply(int matrix_size)
     // init inputs
     for (int i = 0; i < matrix_size; i++){
         for (int j = 0; j <= i; j++){
-            h_A[i*matrix_size + j] = rand() / (float)RAND_MAX;
-            h_B[i*matrix_size + j] = rand() / (float)RAND_MAX;
-        }
-        for (int j = i+1; j<= matrix_size; j++){
-            h_A[i*matrix_size + j] = 0;
-            h_B[i*matrix_size + j] = 0;
+            h_A[i*matrix_size + j] = rand()/(float)RAND_MAX < sparsity ? rand() / (float)RAND_MAX : 0;
+            h_B[i*matrix_size + j] = rand()/(float)RAND_MAX < sparsity ? rand() / (float)RAND_MAX : 0;
         }
     }
 
     basic_mult(h_A, h_B, h_out, matrix_size);
 
-    printf("%f, %f, %f", h_A[0], h_B[0], h_out[0]);
+    printf("Matrix A:\n ");
+    printMatrix(h_A, matrix_size);
+    printf("Matrix B:\n ");
+    printMatrix(h_B, matrix_size);
+    printf("Result:\n ");
+    printMatrix(h_out, matrix_size);
 
 
-    // // allocate device memory
-    // CUDA_CHECK(cudaMalloc((void**)&d_A, bytes));
-    // CUDA_CHECK(cudaMalloc((void**)&d_B, bytes));
-    // CUDA_CHECK(cudaMalloc((void**)&d_out, bytes));
-    // CUDA_CHECK(cudaMemcpy(d_A, h_A, bytes, cudaMemcpyHostToDevice));
-    // CUDA_CHECK(cudaMemcpy(d_B, h_B, bytes, cudaMemcpyHostToDevice));
-    // CUDA_CHECK(cudaMemcpyToSymbol(M, h_kernel, kernel_width*kernel_width*sizeof(float)));
+    // allocate device memory
+    cudaMalloc((void**)&d_A, bytes);
+    cudaMalloc((void**)&d_B, bytes);
+    cudaMalloc((void**)&d_out, bytes);
+    cudaMemcpy(d_A, h_A, bytes, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_B, h_B, bytes, cudaMemcpyHostToDevice);
 
     // launch Kernel
     // printf("\n %s\n", "Launch Kernel....");
@@ -142,8 +150,9 @@ bool multiply(int matrix_size)
     // todo:
     // free memory (both device and host mem)
 
-    // cudaFree(d_out);
-    // cudaFree(d_in);
+    cudaFree(d_A);
+    cudaFree(d_B);
+    cudaFree(d_out);
     free(h_A);
     free(h_B);
     free(h_out);
@@ -165,7 +174,8 @@ int main(int argc, char** argv)
 {
     printf("[Multiplying matrices...]\n\n");
 
-    int matrix_size = 5;
+    int matrix_size = 10;
+    float sparsity = 0.7;
 
     // if (checkCmdLineFlag(argc, (const char **)argv, "width")) {
     //     width = getCmdLineArgumentInt(argc, (const char **)argv, "width");
@@ -183,7 +193,7 @@ int main(int argc, char** argv)
     int dev = 0;
     cudaSetDevice(dev);
 
-    multiply(matrix_size);
+    multiply(matrix_size, sparsity);
 
     // bool result;
     // result = compute(width, height, channels, kernel_width, "vanilla");
