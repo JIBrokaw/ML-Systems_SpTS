@@ -23,6 +23,8 @@ void basic_mult(float* matrix_A, float* matrix_B, float* out, int size)
   }
 }
 
+
+//Helper function to print a matrix in readable form
 void printMatrix(float* matrix, int matrix_size){
   for(int i = 0; i < matrix_size; i++){
     for(int j = 0; j < matrix_size; j++){
@@ -45,7 +47,7 @@ bool multiply(int matrix_size, float sparsity)
     h_B = (float*)malloc(bytes);
     h_out = (float*)malloc(bytes);
 
-    // init inputs
+    // initialize two sparse triangular matrices
     for (int i = 0; i < matrix_size; i++){
         for (int j = 0; j <= i; j++){
             h_A[i*matrix_size + j] = rand()/(float)RAND_MAX < sparsity ? rand() / (float)RAND_MAX : 0;
@@ -177,18 +179,12 @@ int main(int argc, char** argv)
     int matrix_size = 10;
     float sparsity = 0.7;
 
-    // if (checkCmdLineFlag(argc, (const char **)argv, "width")) {
-    //     width = getCmdLineArgumentInt(argc, (const char **)argv, "width");
-    // }
-    // if (checkCmdLineFlag(argc, (const char **)argv, "height")) {
-    //     height = getCmdLineArgumentInt(argc, (const char **)argv, "height");
-    // }
-    // if (checkCmdLineFlag(argc, (const char **)argv, "channels")) {
-    //     channels = getCmdLineArgumentInt(argc, (const char **)argv, "channels");
-    // }
-    // if (checkCmdLineFlag(argc, (const char **)argv, "filter")) {
-    //     kernel_width = getCmdLineArgumentInt(argc, (const char **)argv, "filter");
-    // }
+    if (checkCmdLineFlag(argc, (const char **)argv, "size")) {
+        matrix_size = getCmdLineArgumentInt(argc, (const char **)argv, "size");
+    }
+    if (checkCmdLineFlag(argc, (const char **)argv, "sparsity")) {
+        sparsity = getCmdLineArgumentInt(argc, (const char **)argv, "sparsity");
+    }
 
     int dev = 0;
     cudaSetDevice(dev);
