@@ -7,7 +7,7 @@ OBJ	        = matrix_mult.o
 default: $(EXE)
 
 matrix_mult.o: matrix_mult.cu
-	$(NVCC) --gpu_architecture=sm_50 -c -o $@ matrix_mult.cu $(NVCC_FLAGS)
+	$(NVCC) --gpu-architecture=sm_50 -c -o $@ matrix_mult.cu $(NVCC_FLAGS)
 
 $(EXE): $(OBJ)
 	$(NVCC) $(OBJ) -o $(EXE) $(LD_FLAGS)
