@@ -9,33 +9,17 @@
 #include <cuda_runtime.h>
 #include <sys/time.h>
 #include "common_string.h"
-
-
-
-__global__ void basic_mult(float* matrix_A, float* matrix_B, float* out, int size)
-{
-  for (int output_col = 0; output_col < size; output_col++){
-    for (int row = 0; row < size; row++){
-      float val = 0;
-      for (int col = 0; col <= row; col++){
-        val += matrix_A[row*size + col]*matrix_B[col*size + output_col];
-      }
-      out[row*size + output_col] = val;
-    }
-  }
-}
-
+#include "kernel.cu"
 
 //Helper function to print a matrix in readable form
 void printMatrix(float* matrix, int matrix_size){
-  for(int i = 0; i < matrix_size; i++){
-    for(int j = 0; j < matrix_size; j++){
-      printf(" %f", matrix[matrix_size*i + j]);
+    for(int i = 0; i < matrix_size; i++){
+        for(int j = 0; j < matrix_size; j++){
+            printf(" %f", matrix[matrix_size*i + j]);
+        }
+        printf("\n");
     }
-    printf("\n");
-  }
 }
-
 
 bool multiply(int matrix_size, float sparsity)
 {
@@ -76,8 +60,10 @@ bool multiply(int matrix_size, float sparsity)
     printf("grid dim: %d x %d x %d\n", dimGrid.x, dimGrid.y, dimGrid.z);
     printf("Matrix size: %d*%d\n", matrix_size, matrix_size);
 
-    //     //todo: warmup
+    //todo: warmup
+    vanilla_gpu_mult<<<dimBlock,dimGrid>>>(d_A, d_B, d_out, matrix_size);
 
+    printf("\nbasic_mult:\n");
     gettimeofday(&startTime, NULL);
     basic_mult<<<dimBlock, dimGrid>>>(d_A, d_B, d_out, matrix_size);
     cudaDeviceSynchronize();
@@ -93,12 +79,35 @@ bool multiply(int matrix_size, float sparsity)
     cudaMemcpy(gpu_out, d_out, bytes, cudaMemcpyDeviceToHost);
 
     if(matrix_size <= 15){
-      printf("\nMatrix A:\n ");
-      printMatrix(h_A, matrix_size);
-      printf("Matrix B:\n ");
-      printMatrix(h_B, matrix_size);
-      printf("Result:\n ");
-      printMatrix(gpu_out, matrix_size);
+        printf("\nMatrix A:\n ");
+        printMatrix(h_A, matrix_size);
+        printf("Matrix B:\n ");
+        printMatrix(h_B, matrix_size);
+        printf("Result:\n ");
+        printMatrix(gpu_out, matrix_size);
+    }
+
+    printf("\nvanilla_gpu_mult:\n");
+    gettimeofday(&startTime, NULL);
+    vanilla_gpu_mult<<<dimBlock, dimGrid>>>(d_A, d_B, d_out, matrix_size);
+    cudaDeviceSynchronize();
+    gettimeofday(&endTime, NULL);
+    printf("Time elapsed: %f seconds", (float) ((endTime.tv_sec - startTime.tv_sec)  + (endTime.tv_usec - startTime.tv_usec)/1.0e6));
+    //     double flopsPerMatrixMul = 2.0 * static_cast<double>(kernel_width) * \
+    //                                 static_cast<double>(kernel_width) * static_cast<double>(kernel_width); \
+    //     double numMatrixMul = width*height*channels;
+    //     throughput = (numMatrixMul*flopsPerMatrixMul * 1.0e-9f) / (elapsedTime(timer) / 1000.0f);
+    // }
+
+    cudaMemcpy(gpu_out, d_out, bytes, cudaMemcpyDeviceToHost);
+
+    if(matrix_size <= 15){
+        //printf("\nMatrix A:\n ");
+        //printMatrix(h_A, matrix_size);
+        //printf("Matrix B:\n ");
+        //printMatrix(h_B, matrix_size);
+        printf("\nResult:\n ");
+        printMatrix(gpu_out, matrix_size);
     }
 
     // //todo: getting result
@@ -130,7 +139,7 @@ bool multiply(int matrix_size, float sparsity)
 
 int main(int argc, char** argv)
 {
-    printf("[Multiplying matrices...]\n\n");
+    //printf("[Multiplying matrices...]\n\n");
 
     int matrix_size = 10;
     float sparsity = 0.7;
