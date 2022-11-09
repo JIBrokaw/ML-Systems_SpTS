@@ -21,6 +21,16 @@ void printMatrix(float* matrix, int matrix_size){
     }
 }
 
+void triangular_solve(float* matrix_L, float* b, float* x, int size){
+  for (int row = 0; row < size; row++){
+    float left_sum = 0;
+    for (int col = 0; col < row - 1; col++){
+      left_sum += matrix_L[size*row + col]*b[col];
+    }
+    x[row] = (b[row] - left_sum)/val[size*row + row];
+  }
+}
+
 bool multiply(int matrix_size, float sparsity)
 {
     unsigned int bytes = matrix_size * matrix_size * sizeof(float);
