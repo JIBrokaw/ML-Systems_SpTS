@@ -48,7 +48,7 @@ bool solve(int matrix_size, float sparsity)
     printf("allocated\n");
 
     // // initialize L and b
-    // for (int i = 0; i < matrix_size; i++){
+    for (int i = 0; i < matrix_size; i++){
     //     for (int j = 0; j <= i; j++){
     //         if(j==i){
     //           h_L[i*matrix_size + j] = 1;
@@ -57,8 +57,8 @@ bool solve(int matrix_size, float sparsity)
     //           h_L[i*matrix_size + j] = rand()/(float)RAND_MAX < sparsity ? rand() / (float)RAND_MAX : 0;
     //         }
     //     }
-    //     h_b[i] = rand()/(float)RAND_MAX;
-    // }
+        h_b[i] = rand()/(float)RAND_MAX;
+    }
     // printf("matrix 1 initialized\n");
     CSR csr;
     // convert_matrix_to_csr(&csr, h_L, matrix_size);
