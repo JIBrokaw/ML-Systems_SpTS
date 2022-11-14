@@ -41,6 +41,31 @@ void printVector(float* vector, int size){
   printf("\n");
 }
 
+void create_random_csr(CSR* csr, int size, float sparsity){
+  int numElements = floor(sparsity*size*size);
+  csr->row_pointer = new int[(size+1)*sizeof(int)];//(int*)malloc((size+1)*sizeof(int));
+  csr->col_indices = new int[numElements*sizeof(int)];//(int*)malloc((csr->row_pointer[size])*sizeof(int)); //new int(csr->row_pointer[size]);
+  csr->elements = new double[numElements*sizeof(double)];//(double*)malloc((csr->row_pointer[size])*sizeof(double));//new double(csr->row_pointer[size]);
+
+  csr->row_pointer[0] = 0;
+
+  //Fill values arrays
+  int index = 0;
+  for(int row = 0; row < size; row++){
+    int elements_created = 0;
+    for(int col = 0; col <= row; col++){
+      if(numElements > 0 && rand()/(float)RAND_MAX < sparsity){
+        numElements-=1;
+        elements_created++;
+        csr->col_indices[index] = col;
+        csr->elements[index] = rand()/(float)RAND_MAX;
+        index++;
+      }
+    }
+    csr->row_pointer[row+1] = csr->row_pointer[row] + elements_created;
+  }
+}
+
 void convert_matrix_to_csr(CSR* csr, float* matrix, int size){
   csr->row_pointer = (int*)malloc((size+1)*sizeof(int));
 
