@@ -41,31 +41,35 @@ bool solve(int matrix_size, float sparsity)
     double throughput;
 
     // allocate host memory
-    h_L = (float*)malloc(bytes);
+    // h_L = (float*)malloc(bytes);
     h_b = (float*)malloc(matrix_size * sizeof(float));
     h_x = (float*)malloc(matrix_size * sizeof(float));
 
-    // initialize L and b
-    for (int i = 0; i < matrix_size; i++){
-        for (int j = 0; j <= i; j++){
-            if(j==i){
-              h_L[i*matrix_size + j] = 1;
-            }
-            else{
-              h_L[i*matrix_size + j] = rand()/(float)RAND_MAX < sparsity ? rand() / (float)RAND_MAX : 0;
-            }
-        }
-        h_b[i] = rand()/(float)RAND_MAX;
-    }
+    printf("allocated\n");
+
+    // // initialize L and b
+    // for (int i = 0; i < matrix_size; i++){
+    //     for (int j = 0; j <= i; j++){
+    //         if(j==i){
+    //           h_L[i*matrix_size + j] = 1;
+    //         }
+    //         else{
+    //           h_L[i*matrix_size + j] = rand()/(float)RAND_MAX < sparsity ? rand() / (float)RAND_MAX : 0;
+    //         }
+    //     }
+    //     h_b[i] = rand()/(float)RAND_MAX;
+    // }
+    // printf("matrix 1 initialized\n");
     CSR csr;
-    convert_matrix_to_csr(&csr, h_L, matrix_size);
+    // convert_matrix_to_csr(&csr, h_L, matrix_size);
+    create_random_csr(&csr, matrix_size, sparsity);
     printf("Matrices initialized!\n");
 
     // allocate device memory
-    cudaMalloc((void**)&d_L, bytes);
+    // cudaMalloc((void**)&d_L, bytes);
     cudaMalloc((void**)&d_b, bytes);
     cudaMalloc((void**)&d_x, bytes);
-    cudaMemcpy(d_L, h_L, bytes, cudaMemcpyHostToDevice);
+    // cudaMemcpy(d_L, h_L, bytes, cudaMemcpyHostToDevice);
     cudaMemcpy(d_b, h_b, matrix_size*sizeof(float), cudaMemcpyHostToDevice);
 
     printf("\n %s\n", "Launch Kernel....");
@@ -85,8 +89,9 @@ bool solve(int matrix_size, float sparsity)
     printf("\nbasic_solve:\n");
     gettimeofday(&startTime, NULL);
     // basic_mult<<<dimBlock, dimGrid>>>(d_A, d_B, d_out, matrix_size);
-    // cudaDeviceSynchronize();
     triangular_solve_csr(&csr, h_b, h_x, matrix_size);
+    // cudaDeviceSynchronize();
+
     gettimeofday(&endTime, NULL);
     printf("Time elapsed: %f seconds", (float) ((endTime.tv_sec - startTime.tv_sec)  + (endTime.tv_usec - startTime.tv_usec)/1.0e6));
     //     double flopsPerMatrixMul = 2.0 * static_cast<double>(kernel_width) * \
@@ -137,15 +142,15 @@ bool solve(int matrix_size, float sparsity)
 
     // free memory (both device and host mem)
 
-    cudaFree(d_L);
+    // cudaFree(d_L);
     cudaFree(d_b);
     cudaFree(d_x);
-    free(h_L);
+    // free(h_L);
     free(h_b);
     free(h_x);
-    free(csr.row_pointer);
-    free(csr.col_indices);
-    free(csr.elements);
+    delete(csr.row_pointer);
+    delete(csr.col_indices);
+    delete(csr.elements);
 
     return true;
 }
