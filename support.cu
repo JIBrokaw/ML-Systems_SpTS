@@ -54,7 +54,14 @@ void create_random_csr(CSR* csr, int size, float sparsity){
   for(int row = 0; row < size; row++){
     int elements_created = 0;
     for(int col = 0; col <= row; col++){
-      if(numElements > 0 && rand()/(float)RAND_MAX < sparsity){
+      if(col == row){
+        numElements-=1;
+        elements_created++;
+        csr->col_indices[index] = col;
+        csr->elements[index] = 1;
+        index++;
+      }
+      else if(numElements > 0 && rand()/(float)RAND_MAX < sparsity && numElements +1 > size-row){
         numElements-=1;
         elements_created++;
         csr->col_indices[index] = col;
