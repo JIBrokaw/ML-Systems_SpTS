@@ -1,0 +1,44 @@
+libufget (1.1.1) unstable; urgency=medium
+
+  * Fixes in cmake build system
+
+ -- Martin Köhler <koehlerm@mpi-magdeburg.mpg.de>  Wed, 07 Sep 2022 13:02:40 +0200
+
+libufget (1.1.0) unstable; urgency=medium
+
+  * Fix typos
+  * New modern CMAKE build system
+  * Install cmake target for FIND_PACKAGE config mode
+  * Only symbols with LIBUFGET_EXPORT in libufget.h are exported
+  * Add `uf_matrix_fprint`
+  * Add `uf_query_count`
+
+ -- Martin Köhler <kkoehlerm@mpi-magdeburg.mpg.de>  Wed, 07 Sep 2022 12:58:16 +0200
+
+libufget (1.0.3) unstable; urgency=medium
+
+  * Fix URL. The collection now moved to http://sparse-files.engr.tamu.edu
+  * Fix warning with gcc 9.x
+
+ -- Martin Köhler <koehlerm@mpi-magdeburg.mpg.de>  Mon, 15 Jun 2020 15:54:51 +0200
+
+libufget (1.0.2) unstable; urgency=medium
+
+  * Fix URL. The collection now moved to https://sparse.tamu.edu
+
+ -- Martin Köhler <koehlerm@mpi-magdeburg.mpg.de>  Mon, 15 Jun 2020 15:50:40 +0200
+
+libufget (1.0.1) unstable; urgency=medium
+
+  * Fix URL. The UFcollection now uses https only
+  * Enable FOLLOWLOCATION for libcurl
+  * Fix NAN with xmin and xmax field.
+  * Database version set to 2
+
+ -- Martin Koehler <koehlerm@mpi-magdeburg.mpg.de>  Wed, 20 Sep 2017 09:26:35 +0200
+
+libufget (1.0.0) unstable; urgency=low
+
+  * Initial Release.
+
+ -- Martin Koehler <koehlerm@mpi-magdeburg.mpg.de>  Tue, 21 Jun 2017 11:12:41 +0100

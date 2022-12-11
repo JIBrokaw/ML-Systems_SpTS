@@ -1,0 +1,69 @@
+#image: precise:base
+#before_script:
+#    - apt-get install --yes cmake libmatio-dev libblas-dev libsqlite3-dev libcurl4-openssl-dev
+#    - apt-get install --yes libarchive-dev liblzma-dev
+stages:
+  - build
+
+.test:
+  variables:
+    INSTALL_DIR: $CI_PROJECT_DIR/install
+  script:
+    - mkdir build && cd build
+    - $CMAKE -DCMAKE_BUILD_TYPE=Debug -DCMAKE_PREFIX_PATH=$INSTALL_DIR ../
+    - make
+    - ./src/ufget-update update
+    - ./src/ufget-update download HB 1138_bus
+    - mkdir $INSTALL_DIR
+    - make install
+    - cd ../examples/installed_example
+    - mkdir build && cd build
+    - $CMAKE -DCMAKE_BUILD_TYPE=Debug -DCMAKE_PREFIX_PATH=$INSTALL_DIR ../
+    - make
+    - ./demo
+
+.ubuntu:
+  variables:
+    CMAKE: cmake
+  before_script:
+    - apt-get update
+    - apt-get install --yes cmake libmatio-dev libblas-dev libsqlite3-dev libcurl4-openssl-dev
+    - apt-get install --yes libarchive-dev liblzma-dev
+
+ubuntu2004:
+  stage: build
+  image: docker-registry.csc.mpi-magdeburg.mpg.de:5000/ci-images/minimal/ubuntu:focal
+  extends:
+    - .ubuntu
+    - .test
+
+ubuntu2204:
+  stage: build
+  image: docker-registry.csc.mpi-magdeburg.mpg.de:5000/ci-images/minimal/ubuntu:jammy
+  extends:
+    - .ubuntu
+    - .test
+
+# CentOS 7 does not provide the libmatio, therefore the base images has to ship the epel 6 version from CentOS 6
+centos7:
+  stage: build
+  image: docker-registry.csc.mpi-magdeburg.mpg.de:5000/ci-images/minimal/centos:7-base
+  variables:
+    CMAKE: cmake3
+  before_script:
+    - yum makecache fast
+    - yum install -y cmake3 sqlite-devel libcurl-devel bzip2-devel 	zlib-devel 	matio-devel libarchive-devel openssl-devel blas-devel xz-devel
+  extends:
+    - .test
+
+centos8:
+  stage: build
+  image: docker-registry.csc.mpi-magdeburg.mpg.de:5000/ci-images/minimal/centos:8-base
+  variables:
+    CMAKE: cmake3
+  before_script:
+    - dnf install -y https://rpms.remirepo.net/enterprise/remi-release-8.rpm
+    - yum install -y sqlite-devel libcurl-devel bzip2-devel 	zlib-devel 	libarchive-devel openssl-devel blas-devel xz-devel
+    - yum --enablerepo=remi install -y matio-devel
+  extends:
+    - .test
