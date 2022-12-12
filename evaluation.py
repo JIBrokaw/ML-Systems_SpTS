@@ -273,7 +273,7 @@ class Prediction():
 			optimizer=optim.Adam(model.parameters(),lr=0.01)
 			loss_fun=nn.CrossEntropyLoss()
 
-			for epoch in range(50):
+			for epoch in range(200):
 				y_predict_train = model(X_train_tensor)
 				loss = loss_fun(y_predict_train, y_train_tensor)
 
@@ -281,15 +281,17 @@ class Prediction():
 				loss.backward()
 				optimizer.step()
 
-				y_predict_test=model(X_test_tensor)
-				correct=0
+				if epoch%5 == 0:
+					with torch.no_grad():
+						y_predict_test=model(X_test_tensor)
+						correct=0
 
-				_,predict = torch.max(y_predict_test.data, 1)
+						_,predict = torch.max(y_predict_test.data, 1)
 
-				correct += (predict == y_test_tensor).sum().item()
-				total=len(y_test_tensor)
-				accuracy_NN=correct/total
-				print(accuracy_NN)
+						correct += (predict == y_test_tensor).sum().item()
+						total=len(y_test_tensor)
+						accuracy_NN=correct/total
+						print("Epoch:", epoch, "\t Loss:", loss.item(), "\tAccuracy:", accuracy_NN)
 
 
 		end=time.time()
@@ -917,13 +919,35 @@ if __name__ == "__main__":
 
 		if option == "figure7":
 			figure7 = Prediction()
-			print("Generating Figure 7. Model cross validation scores with 30 features in the feature set")
-			figure7.CrossValidation('./datasets/Training_data.csv',2)
+			print("Generating Figure 7. Original model cross validation scores with 30 features in the feature set")
+			figure7.CrossValidation('./datasets/Training_data.csv',"random_forest",30)
 
+		if option == "random_forest_results":
+			print("Generating Figure 8. Model cross validation scores with only non-level features in the feature set")
+			non_level = Prediction()
+			non_level.CrossValidation('./Training_data.csv',"random_forest", "no_level")
+			print("Generating Figure 8. Model cross validation scores with only 10 features in the feature set")
+			ten_features = Prediction()
+			ten_features.CrossValidation('./Training_data.csv', "random_forest",10)
+			print("Generating Figure 8. Model cross validation scores with all 30 features in the feature set")
+			thirty_features = Prediction()
+			thirty_features.CrossValidation('./Training_data.csv', "random_forest", 30)
+		
+		if option == "nn_results":
+			print("Generating Figure 8. NN cross validation scores with only non-level features in the feature set")
+			non_level = Prediction()
+			non_level.CrossValidation('./Training_data.csv',"nn", "no_level")
+			print("Generating Figure 8. NN cross validation scores with only 10 features in the feature set")
+			ten_features = Prediction()
+			ten_features.CrossValidation('./Training_data.csv', "nn",10)
+			print("Generating Figure 8. NN cross validation scores with all 30 features in the feature set")
+			thirty_features = Prediction()
+			thirty_features.CrossValidation('./Training_data.csv', "nn", 30)
+		
 		if option == "figure8":
 			figure6 = Prediction()
-			print("Generating Figure 8. Model cross validation scores with 10 features in the feature set")
-			figure6.CrossValidation('./datasets/Training_data.csv',1)
+			print("Generating Figure 8. Original model cross validation scores with 10 features in the feature set")
+			figure6.CrossValidation('./datasets/Training_data.csv',"random_forest", 10)
 
 		if option == "figure9":
 			figure7 = Performance()
