@@ -10,9 +10,15 @@ from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn import model_selection
 from sklearn.exceptions import UndefinedMetricWarning
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 import warnings
 import numpy as np
 import scipy as sp
+import time
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
 
 class CPUGPUComparison():
 	def __init__( self ):
@@ -169,6 +175,34 @@ class FeatureSelection():
 		feature_df_sorted.index += 1
 		print(feature_df_sorted.to_string(index=True))
 
+def load_data(trainset,testset,batch_size):
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=True, num_workers=2)
+    testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size, shuffle=False, num_workers=2)
+    return trainloader,testloader
+
+class NN(nn.Module):
+	def __init__(self,n_input,n_hidden,n_output):
+		super(NN,self).__init__()
+
+		self.hidden1 = nn.Linear(n_input,n_hidden)
+		self.hidden2 = nn.Linear(n_hidden,n_hidden)
+		self.predict = nn.Linear(n_hidden,n_output)
+	
+	def forward(self,input):
+		out = self.hidden1(input)
+		out = F.relu(out)
+		out = self.hidden2(out)
+		out = F.relu(out)
+		out =self.predict(out)
+		
+		return out
+
+def weight_init(model):
+    for layer in model.modules():
+        if isinstance(layer, torch.nn.Linear):
+            torch.nn.init.xavier_normal_(layer.weight.unsqueeze(0))
+    return model
+
 class Prediction():
 	def __init__( self ):
 		print('Prediction\n')
@@ -193,9 +227,9 @@ class Prediction():
 
 		for i in range(len(training_data)):
 			if(training_data.iloc[i]['mkl_seq']<training_data.iloc[i]['cusparse_v2_lvl']):
-				training_data.loc[i:i,'winner_of_two']=1
+				training_data.loc[i:i,'winner_of_two']=0
 			else:
-				training_data.loc[i:i,'winner_of_two']=6
+				training_data.loc[i:i,'winner_of_two']=1
 
 		#y = training_data['winner']
 		y=training_data['winner_of_two']
@@ -203,9 +237,48 @@ class Prediction():
 		X_scaled = sc.fit_transform(X)
 		X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.25, random_state=44)
 
+		start=time.time()
+		
 		rfc_algo_selection = RandomForestClassifier(n_estimators=300)
 		rfc_algo_selection.fit(X_train, y_train)
 		pred_rfc_algo_selection = rfc_algo_selection.predict(X_test)
+
+		X_train_tensor=torch.from_numpy(X_train).to(torch.float32)
+		X_test_tensor=torch.from_numpy(X_test).to(torch.float32)
+		
+		y_train_array = np.array(y_train)
+		y_train_tensor = torch.tensor(y_train_array)
+
+		y_test_array = np.array(y_test)
+		y_test_tensor = torch.tensor(y_test_array)
+		
+		model=NN(10,20,2)
+		model=weight_init(model)
+
+		optimizer=optim.Adam(model.parameters(),lr=0.01)
+		loss_fun=nn.CrossEntropyLoss()
+
+		for epoch in range(50):
+			y_predict_train = model(X_train_tensor)
+			loss = loss_fun(y_predict_train, y_train_tensor)
+
+			optimizer.zero_grad()
+			loss.backward()
+			optimizer.step()
+			
+			y_predict_test=model(X_test_tensor)
+			correct=0
+
+			_,predict = torch.max(y_predict_test.data, 1)
+				
+			correct += (predict == y_test_tensor).sum().item()
+			total=len(y_test_tensor)
+			accurcay_NN=correct/total
+			print(accurcay_NN)
+
+
+		end=time.time()
+		print("running time with 10 features:",end-start)
 		
 		seed = 10
 		cv_results = []
