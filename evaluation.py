@@ -192,20 +192,21 @@ class Prediction():
 		training_data.insert(training_data.shape[1], 'winner_of_two', 0)
 
 		for i in range(len(training_data)):
-			if(training_data.iloc[i]['mkl_seq']<training_data.iloc[i]['syncfree']):
+			if(training_data.iloc[i]['mkl_seq']<training_data.iloc[i]['cusparse_v2_lvl']):
 				training_data.loc[i:i,'winner_of_two']=1
 			else:
 				training_data.loc[i:i,'winner_of_two']=6
 
 		#y = training_data['winner']
 		y=training_data['winner_of_two']
-		print(y)
 		sc = StandardScaler()
 		X_scaled = sc.fit_transform(X)
 		X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.25, random_state=44)
+
 		rfc_algo_selection = RandomForestClassifier(n_estimators=300)
 		rfc_algo_selection.fit(X_train, y_train)
 		pred_rfc_algo_selection = rfc_algo_selection.predict(X_test)
+		
 		seed = 10
 		cv_results = []
 		accuracy = 'accuracy'
@@ -226,9 +227,9 @@ class Prediction():
 		cv_results.append(scores[test_recall])
 		cv_results.append(scores[test_f1])
 
-		print("selected algorithms:\n",pred_rfc_algo_selection,"\n")
+		#print("selected algorithms:\n",pred_rfc_algo_selection,"\n")
 
-		'''
+		
 		print('Mean accuracy: %0.1f %%' % (cv_results[0].mean()*100.0))
 		print('Mean precision: %0.1f %%' % (cv_results[1].mean()*100.0))
 		print('Mean recall: %0.1f %%' % (cv_results[2].mean()*100.0))
@@ -238,6 +239,7 @@ class Prediction():
 		print('Median recall: %0.1f %%' % (np.median(cv_results[2])*100.0))
 		print('Median f1-score: %0.1f %%\n' % (np.median(cv_results[3])*100.0))
 		
+		'''
 		labels = ['Accuracy', 'Precision', 'Recall', 'F1-score']
 		ax1 = sns.boxplot(y=cv_results,x=labels, showmeans=True, fliersize=1,meanprops={"marker":"D","markerfacecolor":"yellow", "markeredgecolor":"none"})
 		sns.set(font_scale=1.3)
