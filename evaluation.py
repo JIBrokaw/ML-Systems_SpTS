@@ -209,18 +209,31 @@ class Prediction():
 
 	def CrossValidation(self, filename, mode):
 		training_data = pd.read_csv(filename)
-
-		if mode == 1:  # Traning set for 10 features
+		num_features = mode
+  
+		if mode == 10:  # Training set for 10 features
 			X = training_data.drop(['min_rl_cnt','mean_rpl','median_rpl','max_cl','lvls','std_rpl', \
-				'mean_max_cl_pl','mean_mean_cl_pl','max_rl','mean_std_cl_pl','mean_max_rl_pl',\
-				'std_cl','mean_std_rl_pl','mean_mean_rl_pl','mean_median_rl_pl','mean_min_rl_pl',\
-				'mean_rl','median_rl','median_cl','std_rl','mkl_seq','mkl_par','cusparse_v1',\
-				'cusparse_v2_lvl','cusparse_v2_nolvl','syncfree','winner','CPU winner','GPU winner',\
-				'2nd','3rd','4th','5th','6th'], axis=1)
-		else: # Traning set for 30 features
+			'mean_max_cl_pl','mean_mean_cl_pl','max_rl','mean_std_cl_pl','mean_max_rl_pl',\
+			'std_cl','mean_std_rl_pl','mean_mean_rl_pl','mean_median_rl_pl','mean_min_rl_pl',\
+			'mean_rl','median_rl','median_cl','std_rl','mkl_seq','mkl_par','cusparse_v1',\
+			'cusparse_v2_lvl','cusparse_v2_nolvl','syncfree','winner','CPU winner','GPU winner',\
+			'2nd','3rd','4th','5th','6th'], axis=1)
+
+		elif mode == 30: # Training set for 30 features
 			X = training_data.drop(['mkl_seq','mkl_par','cusparse_v1','cusparse_v2_lvl', \
-				'cusparse_v2_nolvl','syncfree','winner','CPU winner','GPU winner','2nd',\
-				'3rd','4th','5th','6th'], axis=1)
+			'cusparse_v2_nolvl','syncfree','winner','CPU winner','GPU winner','2nd',\
+			'3rd','4th','5th','6th'], axis=1)
+
+		elif mode == "no_level":
+			num_features = 14
+			X = training_data.drop(['max_nnz_pl_rw', 'mean_nnz_pl_rw', 'std_nnz_pl_rw',\
+			'max_nnz_pl_cw', 'max_rpl', 'mean_rpl', 'median_rpl', 'std_rpl', 'lvls', \
+			'mean_max_cl_pl', 'mean_mean_cl_pl', 'mean_std_cl_pl', 'mean_max_cl_pl', \
+			'mean_std_rl_pl', 'mean_mean_rl_pl', 'mean_median_rl_pl', 'mean_min_rl_pl', \
+			'mkl_seq','mkl_par','cusparse_v1','cusparse_v2_lvl', \
+			'cusparse_v2_nolvl','syncfree','winner','CPU winner','GPU winner','2nd',\
+			'3rd','4th','5th','6th'], axis=1)
+      
 		
 		#build a new column to save the winner of mkl_seq and syncfree
 		training_data.insert(training_data.shape[1], 'winner_of_two', 0)
@@ -239,78 +252,81 @@ class Prediction():
 
 		start=time.time()
 		
-		rfc_algo_selection = RandomForestClassifier(n_estimators=300)
-		rfc_algo_selection.fit(X_train, y_train)
-		pred_rfc_algo_selection = rfc_algo_selection.predict(X_test)
-
-		X_train_tensor=torch.from_numpy(X_train).to(torch.float32)
-		X_test_tensor=torch.from_numpy(X_test).to(torch.float32)
+		if(model_name == "random_forest"):
+			rfc_algo_selection = RandomForestClassifier(n_estimators=300)
+			rfc_algo_selection.fit(X_train, y_train)
+			pred_rfc_algo_selection = rfc_algo_selection.predict(X_test)
 		
-		y_train_array = np.array(y_train)
-		y_train_tensor = torch.tensor(y_train_array)
+		elif(model_name == "nn"):
+			X_train_tensor=torch.from_numpy(X_train).to(torch.float32)
+			X_test_tensor=torch.from_numpy(X_test).to(torch.float32)
 
-		y_test_array = np.array(y_test)
-		y_test_tensor = torch.tensor(y_test_array)
-		
-		model=NN(10,20,2)
-		model=weight_init(model)
+			y_train_array = np.array(y_train)
+			y_train_tensor = torch.tensor(y_train_array)
 
-		optimizer=optim.Adam(model.parameters(),lr=0.01)
-		loss_fun=nn.CrossEntropyLoss()
+			y_test_array = np.array(y_test)
+			y_test_tensor = torch.tensor(y_test_array)
 
-		for epoch in range(50):
-			y_predict_train = model(X_train_tensor)
-			loss = loss_fun(y_predict_train, y_train_tensor)
+			model=NN(10,20,2)
+			model=weight_init(model)
 
-			optimizer.zero_grad()
-			loss.backward()
-			optimizer.step()
-			
-			y_predict_test=model(X_test_tensor)
-			correct=0
+			optimizer=optim.Adam(model.parameters(),lr=0.01)
+			loss_fun=nn.CrossEntropyLoss()
 
-			_,predict = torch.max(y_predict_test.data, 1)
-				
-			correct += (predict == y_test_tensor).sum().item()
-			total=len(y_test_tensor)
-			accurcay_NN=correct/total
-			print(accurcay_NN)
+			for epoch in range(50):
+				y_predict_train = model(X_train_tensor)
+				loss = loss_fun(y_predict_train, y_train_tensor)
+
+				optimizer.zero_grad()
+				loss.backward()
+				optimizer.step()
+
+				y_predict_test=model(X_test_tensor)
+				correct=0
+
+				_,predict = torch.max(y_predict_test.data, 1)
+
+				correct += (predict == y_test_tensor).sum().item()
+				total=len(y_test_tensor)
+				accuracy_NN=correct/total
+				print(accuracy_NN)
 
 
 		end=time.time()
 		print("running time with 10 features:",end-start)
 		
-		seed = 10
-		cv_results = []
-		accuracy = 'accuracy'
-		precision = 'precision_weighted'
-		recall = 'recall_weighted'
-		f1_score = 'f1_weighted'
-		test_precision = 'test_precision_weighted'
-		test_recall = 'test_recall_weighted'
-		test_f1 = 'test_f1_weighted'
-		test_accuracy = 'test_accuracy'
-		warnings.filterwarnings("ignore", category=UndefinedMetricWarning)
-		scoring = [accuracy, precision, recall,f1_score]
-		kfold = model_selection.KFold(n_splits=10, random_state=seed,shuffle=True)
-		with warnings.catch_warnings():
-			scores = model_selection.cross_validate(rfc_algo_selection, X_scaled, y, cv=kfold,scoring=scoring)
-		cv_results.append(scores[test_accuracy])
-		cv_results.append(scores[test_precision])
-		cv_results.append(scores[test_recall])
-		cv_results.append(scores[test_f1])
+		if(model_name == "random_forest"):
+			seed = 10
+			cv_results = []
+			accuracy = 'accuracy'
+			precision = 'precision_weighted'
+			recall = 'recall_weighted'
+			f1_score = 'f1_weighted'
+			test_precision = 'test_precision_weighted'
+			test_recall = 'test_recall_weighted'
+			test_f1 = 'test_f1_weighted'
+			test_accuracy = 'test_accuracy'
+			warnings.filterwarnings("ignore", category=UndefinedMetricWarning)
+			scoring = [accuracy, precision, recall,f1_score]
+			kfold = model_selection.KFold(n_splits=10, random_state=seed,shuffle=True)
+			with warnings.catch_warnings():
+				scores = model_selection.cross_validate(rfc_algo_selection, X_scaled, y, cv=kfold,scoring=scoring)
+			cv_results.append(scores[test_accuracy])
+			cv_results.append(scores[test_precision])
+			cv_results.append(scores[test_recall])
+			cv_results.append(scores[test_f1])
 
-		#print("selected algorithms:\n",pred_rfc_algo_selection,"\n")
+			#print("selected algorithms:\n",pred_rfc_algo_selection,"\n")
 
-		
-		print('Mean accuracy: %0.1f %%' % (cv_results[0].mean()*100.0))
-		print('Mean precision: %0.1f %%' % (cv_results[1].mean()*100.0))
-		print('Mean recall: %0.1f %%' % (cv_results[2].mean()*100.0))
-		print('Mean f1-score: %0.1f %%' % (cv_results[3].mean()*100.0))
-		print('Median accuracy: %0.1f %%' % (np.median(cv_results[0])*100.0))
-		print('Median precision: %0.1f %%' % (np.median(cv_results[1])*100.0))
-		print('Median recall: %0.1f %%' % (np.median(cv_results[2])*100.0))
-		print('Median f1-score: %0.1f %%\n' % (np.median(cv_results[3])*100.0))
+
+			print('Mean accuracy: %0.1f %%' % (cv_results[0].mean()*100.0))
+			print('Mean precision: %0.1f %%' % (cv_results[1].mean()*100.0))
+			print('Mean recall: %0.1f %%' % (cv_results[2].mean()*100.0))
+			print('Mean f1-score: %0.1f %%' % (cv_results[3].mean()*100.0))
+			print('Median accuracy: %0.1f %%' % (np.median(cv_results[0])*100.0))
+			print('Median precision: %0.1f %%' % (np.median(cv_results[1])*100.0))
+			print('Median recall: %0.1f %%' % (np.median(cv_results[2])*100.0))
+			print('Median f1-score: %0.1f %%\n' % (np.median(cv_results[3])*100.0))
 		
 		'''
 		labels = ['Accuracy', 'Precision', 'Recall', 'F1-score']
