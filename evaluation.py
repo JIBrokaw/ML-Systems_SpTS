@@ -354,25 +354,77 @@ class Performance():
 	def __init__( self ):
 		print('Performance Results\n')
 
-	def Speedup(self, filename):
+	def Speedup(self, filename, model_name = "random_forest"):
 		training_data = pd.read_csv(filename)
-		X = training_data.drop(['mkl_seq','mkl_par','cusparse_v1','cusparse_v2_lvl', \
-				'cusparse_v2_nolvl','syncfree','winner','CPU winner','GPU winner','2nd',\
-				'3rd','4th','5th','6th'], axis=1)
-		y = training_data['winner']
+		num_features = 14
+		X = training_data.drop(['max_nnz_pl_rw', 'mean_nnz_pl_rw', 'std_nnz_pl_rw',\
+		'max_nnz_pl_cw', 'max_rpl', 'mean_rpl', 'median_rpl', 'std_rpl', 'lvls', \
+		'mean_max_cl_pl', 'mean_mean_cl_pl', 'mean_std_cl_pl', 'mean_max_cl_pl', \
+		'mean_std_rl_pl', 'mean_mean_rl_pl', 'mean_median_rl_pl', 'mean_min_rl_pl', \
+		'mkl_seq','mkl_par','cusparse_v1','cusparse_v2_lvl', \
+		'cusparse_v2_nolvl','syncfree','winner','CPU winner','GPU winner','2nd',\
+		'3rd','4th','5th','6th'], axis=1)
+		
+		 #build a new column to save the winner of mkl_seq and syncfree
+		training_data.insert(training_data.shape[1], 'winner_of_two', 0)
+
+		for i in range(len(training_data)):
+			if(training_data.iloc[i]['mkl_seq']<training_data.iloc[i]['cusparse_v2_lvl']):
+				training_data.loc[i:i,'winner_of_two']=0
+			else:
+				training_data.loc[i:i,'winner_of_two']=1
+
+		y=training_data['winner_of_two']
 		sc = StandardScaler()
 		X_scaled = sc.fit_transform(X)
 		X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.25, random_state=44)
-		rfc_algo_selection = RandomForestClassifier(n_estimators=300)
-		rfc_algo_selection.fit(X_train, y_train)
-		pred_rfc_algo_selection = rfc_algo_selection.predict(X_test)
-		seed = 10
-		precision = 'precision_weighted'
-		recall = 'recall_weighted'
-		f1_score = 'f1_weighted'
-		scoring = [precision, recall,f1_score]
-		kfold = model_selection.KFold(n_splits=10)
-		cross_validate_pred = model_selection.cross_val_predict(rfc_algo_selection, X_scaled, y, cv=kfold)
+		
+		if model_name == "random_forest":
+			rfc_algo_selection = RandomForestClassifier(n_estimators=300)
+			rfc_algo_selection.fit(X_train, y_train)
+			pred_rfc_algo_selection = rfc_algo_selection.predict(X_test)
+			seed = 10
+			precision = 'precision_weighted'
+			recall = 'recall_weighted'
+			f1_score = 'f1_weighted'
+			scoring = [precision, recall,f1_score]
+			kfold = model_selection.KFold(n_splits=10)
+			cross_validate_pred = model_selection.cross_val_predict(rfc_algo_selection, X_scaled, y, cv=kfold)
+		else:
+			X_train_tensor=torch.from_numpy(X_train).to(torch.float32)
+			X_test_tensor=torch.from_numpy(X_test).to(torch.float32)
+
+			y_train_array = np.array(y_train)
+			y_train_tensor = torch.tensor(y_train_array)
+
+			y_test_array = np.array(y_test)
+			y_test_tensor = torch.tensor(y_test_array)
+
+			model=NN(num_features,30,2)
+			model=weight_init(model)
+
+			optimizer=optim.Adam(model.parameters(),lr=0.01)
+			loss_fun=nn.CrossEntropyLoss()
+
+			for epoch in range(350):
+				y_predict_train = model(X_train_tensor)
+				loss = loss_fun(y_predict_train, y_train_tensor)
+
+				optimizer.zero_grad()
+				loss.backward()
+				optimizer.step()
+        
+			with torch.no_grad():
+				X_scaled_tensor = torch.from_numpy(X_scaled).to(torch.float32)
+				Y_total = torch.from_numpy(np.array(y)).to(torch.float32)
+				y_predict_test=model(X_scaled_tensor)
+				correct=0
+
+				_,predict = torch.max(y_predict_test.data, 1)
+				cross_validate_pred = predict
+				print(predict)
+				print(len(predict))
+				
 		MKL_seq = training_data['mkl_seq']
 		MKL_par = training_data['mkl_par']
 		cus1 = training_data['cusparse_v1']
@@ -390,18 +442,10 @@ class Performance():
 		i = 0
 
 		for val in cross_validate_pred:
-		    if val == 1:
+		    if val == 0:
 		        predicted_time = MKL_seq[i]
-		    if val == 2:
-		        predicted_time = MKL_par[i]
-		    if val == 3:
-		        predicted_time = cus1[i]
-		    if val == 4:
+		    if val == 1:
 		        predicted_time = cus2_lvl[i]
-		    if val == 5:
-		        predicted_time = cus2_nolvl[i]
-		    if val == 6:
-		        predicted_time = syncfree[i]
 		    
 		    Gain_vs_MKL_seq.append(MKL_seq[i]/predicted_time)
 		    Gain_vs_MKL_par.append(MKL_par[i]/predicted_time)
@@ -447,7 +491,6 @@ class Performance():
 
 		for i in range(2):    
 			for j in range(3):
-				#my_bins = [0,1,2,3,4,5,6,7,8,9,10,20,30,40,50,60,int(np.max(predicted_speedup[k]))]
 				max_ps = np.max(predicted_speedup[k])
 				my_bins = np.arange(0, 75)
 				clrs=['#CB4335' if (x < 1) else '#2874A6' for x in my_bins]				
@@ -484,7 +527,191 @@ class Performance():
 			fig.savefig('./datasets/figure9.pdf',bbox_inches='tight',rasterized=True)
 			print("Figure 9 saved in datasets as figure9.eps")
 			print("Note: Statistics can slightly vary from Figure 9 and from run-to-run")
-		#plt.show()
+		
+	 def Loss(self, filename, model_name = "random_forest"):
+		#Train original model
+		training_data = pd.read_csv(filename)
+		X = training_data.drop(['mkl_seq','mkl_par','cusparse_v1','cusparse_v2_lvl', \
+		'cusparse_v2_nolvl','syncfree','winner','CPU winner','GPU winner','2nd',\
+		'3rd','4th','5th','6th'], axis=1)
+		y = training_data['winner']
+		sc = StandardScaler()
+		X_scaled = sc.fit_transform(X)
+		X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.25, random_state=44)
+		rfc_algo_selection = RandomForestClassifier(n_estimators=300)
+		rfc_algo_selection.fit(X_train, y_train)
+		pred_rfc_algo_selection = rfc_algo_selection.predict(X_test)
+		seed = 10
+		precision = 'precision_weighted'
+		recall = 'recall_weighted'
+		f1_score = 'f1_weighted'
+		scoring = [precision, recall,f1_score]
+		kfold = model_selection.KFold(n_splits=10)
+		original_cross_validate_pred = model_selection.cross_val_predict(rfc_algo_selection, X_scaled, y, cv=kfold)
+
+		#Train new model
+		training_data = pd.read_csv(filename)
+		X = training_data.drop(['max_nnz_pl_rw', 'mean_nnz_pl_rw', 'std_nnz_pl_rw',\
+		'max_nnz_pl_cw', 'max_rpl', 'mean_rpl', 'median_rpl', 'std_rpl', 'lvls', \
+		'mean_max_cl_pl', 'mean_mean_cl_pl', 'mean_std_cl_pl', 'mean_max_cl_pl', \
+		'mean_std_rl_pl', 'mean_mean_rl_pl', 'mean_median_rl_pl', 'mean_min_rl_pl', \
+		'mkl_seq','mkl_par','cusparse_v1','cusparse_v2_lvl', \
+		'cusparse_v2_nolvl','syncfree','winner','CPU winner','GPU winner','2nd',\
+		'3rd','4th','5th','6th'], axis=1)
+		#build a new column to save the winner of mkl_seq and syncfree
+		training_data.insert(training_data.shape[1], 'winner_of_two', 0)
+    
+		for i in range(len(training_data)):
+			if(training_data.iloc[i]['mkl_seq']<training_data.iloc[i]['cusparse_v2_lvl']):
+				training_data.loc[i:i,'winner_of_two']=0
+			else:
+				training_data.loc[i:i,'winner_of_two']=1
+
+		y=training_data['winner_of_two']
+		sc = StandardScaler()
+		X_scaled = sc.fit_transform(X)
+		X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.25, random_state=44)
+
+		if model_name == "random_forest":
+			rfc_algo_selection = RandomForestClassifier(n_estimators=300)
+			rfc_algo_selection.fit(X_train, y_train)
+			pred_rfc_algo_selection = rfc_algo_selection.predict(X_test)
+			seed = 10
+			precision = 'precision_weighted'
+			recall = 'recall_weighted'
+			f1_score = 'f1_weighted'
+			scoring = [precision, recall,f1_score]
+			kfold = model_selection.KFold(n_splits=10)
+			new_cross_validate_pred = model_selection.cross_val_predict(rfc_algo_selection, X_scaled, y, cv=kfold)
+    
+		else:
+			X_train_tensor=torch.from_numpy(X_train).to(torch.float32)
+			X_test_tensor=torch.from_numpy(X_test).to(torch.float32)
+
+			y_train_array = np.array(y_train)
+			y_train_tensor = torch.tensor(y_train_array)
+
+			y_test_array = np.array(y_test)
+			y_test_tensor = torch.tensor(y_test_array)
+
+			model=NN(14,30,2)
+			model=weight_init(model)
+
+			optimizer=optim.Adam(model.parameters(),lr=0.01)
+			loss_fun=nn.CrossEntropyLoss()
+
+			for epoch in range(350):
+				y_predict_train = model(X_train_tensor)
+				loss = loss_fun(y_predict_train, y_train_tensor)
+
+				optimizer.zero_grad()
+				loss.backward()
+				optimizer.step()
+        
+			with torch.no_grad():
+				X_scaled_tensor = torch.from_numpy(X_scaled).to(torch.float32)
+				Y_total = torch.from_numpy(np.array(y)).to(torch.float32)
+				y_predict_test=model(X_scaled_tensor)
+				correct=0
+
+				_,predict = torch.max(y_predict_test.data, 1)
+				new_cross_validate_pred = predict
+				print(predict)
+				print(len(predict))
+
+		MKL_seq = training_data['mkl_seq']
+		MKL_par = training_data['mkl_par']
+		cus1 = training_data['cusparse_v1']
+		cus2_lvl = training_data['cusparse_v2_lvl']
+		cus2_nolvl = training_data['cusparse_v2_nolvl']
+		syncfree = training_data['syncfree']
+		algo_labels = {0:'MKL(seq)', 1:'MKL(par)', 2:'cuSPARSE(v1)', \
+		    3:'cuSPARSE(v2)(level-sch.)',4:'cuSPARSE(v2)(no level-sch.)',5:'Sync-Free'}
+		Gain_vs_MKL_seq = []
+		Gain_vs_MKL_par = []
+		Gain_vs_cus1 = []
+		Gain_vs_cus2_lvl = []
+		Gain_vs_cus2_nolvl = []
+		Gain_vs_syncfree = []
+		Loss_vs_original = []
+		i = 0
+
+		for idx in range(len(original_cross_validate_pred)):
+			if new_cross_validate_pred[idx] == 0:
+				new_predicted_time = MKL_seq[idx]
+			else:
+			  	new_predicted_time = cus2_lvl[idx]
+
+			if original_cross_validate_pred[idx] == 1:
+			    	predicted_time = MKL_seq[idx]
+			elif original_cross_validate_pred[idx] == 2:
+			   	predicted_time = MKL_par[idx]
+			elif original_cross_validate_pred[idx] == 3:
+			  	predicted_time = cus1[idx]
+			elif original_cross_validate_pred[idx] == 4:
+			    	predicted_time = cus2_lvl[idx]
+			elif original_cross_validate_pred[idx] == 5:
+			    	predicted_time = cus2_nolvl[idx]
+			elif original_cross_validate_pred[idx] == 6:
+			    	predicted_time = syncfree[idx]
+
+			Loss_vs_original.append(new_predicted_time - predicted_time)
+
+		predicted_speedup=[]
+		predicted_speedup.append(Loss_vs_original)
+
+		speedup_g2 = []
+		speedup_l1 = []
+		counter = 0
+		counter_l = 0
+		counter_l95 = 0
+
+		for i in range(1):
+			for x in predicted_speedup[i]:
+            			if x >= 1:
+                			counter = counter + 1
+            			if x < 1:
+                			counter_l = counter_l + 1
+            			if x < 0.95:
+                			counter_l95 = counter_l95 + 1
+			speedup_g2.append(counter/998*100)
+			speedup_l1.append(counter_l/998*100)
+			counter = 0
+			counter_l = 0
+			counter_l95 = 0
+
+		sns.set(font_scale=1.0)
+		sns.set_style("white")
+		fig, ax = plt.subplots(nrows=2, ncols=3, figsize=(20, 9))
+		fig.set_rasterized(True)
+		k = 0
+
+	for i in range(1):    
+		for j in range(1):
+			max_ps = np.max(predicted_speedup[k])
+			my_bins = np.arange(-75, 75)
+			clrs=['#CB4335' if (x < 1) else '#2874A6' for x in my_bins]				
+			plot = sns.distplot(predicted_speedup[k], \
+			  bins=my_bins, ax=ax[i][j],kde=False)
+			sns.color_palette("husl", 8)
+			ax1 = plot.axes
+			for rec, clr in zip(ax1.patches, clrs):
+			  rec.set_color(clr)
+        
+			props = dict(boxstyle='round', facecolor='none', alpha=0.5)
+			ax1.text(0.55, 0.70, "Avg time lost: %.1f%%"%(np.mean(predicted_speedup[k])), transform=ax1.transAxes, fontsize=12,
+			verticalalignment='top', bbox=props)
+			plot.set_yscale("log")
+			plot.set_xlabel("Speedup")
+			plot.set_title(algo_labels[k],loc="left")
+			if k == 0 or k == 3:
+				plot.set_ylabel('Number of matrices')
+			k = k + 1		        
+		plt.tight_layout()
+		warnings.filterwarnings("ignore")
+		with warnings.catch_warnings():
+			print("Figure 9 saved in datasets as figure9.eps")
+			print("Note: Statistics can slightly vary from Figure 9 and from run-to-run")
 
 	def Overheads(self, filename_training, filename_overhead):
 		training_data=pd.read_csv(filename_training)
